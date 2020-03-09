@@ -116,23 +116,17 @@ uint16_t scale_value()
   Serial.print("Scaled sensor: ");
   Serial.print(value, DEC);
 #endif
-  value -= (avgVol/2.0);
-#if defined(LOUD_DEBUG)
-  Serial.print(" ");
-  Serial.print(value, DEC);
-#endif
   if((value < 0) || (value > 0x7fff))
     value = 0;
-  value = pow(value/maxVol, 2.0) * 1023;
+  //value = pow(1024, value/maxVol) - 1;
+  value = (pow(512, value/maxVol) - 1)*2;
 #if defined(LOUD_DEBUG)
   Serial.print(" ");
   Serial.print(value, DEC);
 #endif
 
-  avgval = (avgval + value)/2;
-  
   if (value > maxVol)
-    maxVol = value;
+    maxVol = v1;
 
   if(millis() > lastt+5000)
   {
@@ -141,10 +135,12 @@ uint16_t scale_value()
   }
   if(maxVol > 1023) maxVol = 1023;
   
-  if((value < avgval+10) && (value > avgval-10))
+  if((value < avgval+100) && (value > avgval-100))
   {
     value = avgval;
   }
+  else
+    avgval = (avgval + value)/2;
 
 #if defined(LOUD_DEBUG)
   Serial.print(" ");
