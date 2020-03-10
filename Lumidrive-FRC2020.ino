@@ -76,7 +76,7 @@ uint8_t loudness = false;
 void testForLoudSensor()
 {
 #if defined(LOUD_DEBUG)
-    Serial.print("Loudness sensor ");
+  Serial.print("Loudness sensor ");
 #endif
   sw.beginTransmission(qwiicAddress);
   sw.write(COMMAND_LED_ON);  // command for status
@@ -98,58 +98,63 @@ void testForLoudSensor()
 
 float maxVol = 15.0;    //Holds the largest volume recorded thus far to proportionally adjust the visual's responsiveness.
 float avgVol = 0.0;     //Holds the "average" volume-level to proportionally adjust the visual experience.
-uint16_t value = 0;    //Holds the volume level read from the sound detector.
+int16_t value = 0;      //Holds the volume level read from the sound detector.
 uint32_t lastt;
-uint16_t avgval = 0;
+int16_t avgval = 0;
+#define QUIET_RANGE 100
+#define MIN_VOL 0x140
 
 uint16_t scale_value()
 {
   uint16_t v1;
   value = get_value();
 
-  if (value < avgVol / 2.0 || value < 0x140 || value > 1023)
-    value = 0;
-  else
-    avgVol = (avgVol + value) / 2.0;      // If non-zero, take an "average" of volumes.
-  v1 = value;
 #if defined(LOUD_DEBUG)
   Serial.print("Scaled sensor: ");
   Serial.print(value, DEC);
 #endif
-  if((value < 0) || (value > 0x7fff))
+  if ((value < 0) || (value > 1023))      // out of range
     value = 0;
+  v1 = value;
+  if ((value < avgVol / 2.0) || (value < MIN_VOL))
+    value = 0;
+  else
+    avgVol = (avgVol + value) / 2.0;      // If non-zero, take an "average" of volumes.
   //value = pow(1024, value/maxVol) - 1;
-  value = (pow(512, value/maxVol) - 1)*2;
+  value = (pow(512, value / maxVol) - 1) * 2; // scale
 #if defined(LOUD_DEBUG)
-  Serial.print(" ");
+  Serial.print(" pow:");
   Serial.print(value, DEC);
 #endif
 
-  if (value > maxVol)
+  if (value > maxVol)                     // track max volume
     maxVol = v1;
-
-  if(millis() > lastt+5000)
+  else if (millis() > lastt + 5000)
   {
     maxVol = (maxVol + v1) / 2.0;
     lastt = millis();
   }
-  if(maxVol > 1023) maxVol = 1023;
-  
-  if((value < avgval+100) && (value > avgval-100))
+  if (maxVol > 1023) maxVol = 1023;
+
+                                          // if close to avgvol use avgvol
+                                          // damp little flickers
+  if ((value < avgval + QUIET_RANGE) && (value > avgval - QUIET_RANGE))
   {
     value = avgval;
   }
   else
-    avgval = (avgval + value)/2;
+    avgval = (avgval + value) / 2;
 
 #if defined(LOUD_DEBUG)
   Serial.print(" ");
   Serial.print(value, DEC);
-  Serial.print(" ");
+  Serial.print(" avgval:");
   Serial.print(avgval, DEC);
-  Serial.print(" ");
+  Serial.print(" abs:");
+  Serial.print(abs(value - avgval), DEC);
+  Serial.print(" avgV:");
   Serial.print(avgVol, DEC);
-  Serial.print(" ");
+  Serial.print(" maxV:");
   Serial.println(maxVol, DEC);
 #endif
   return value;
@@ -159,12 +164,12 @@ uint16_t get_value()
 {
   static uint8_t led = 0;
   uint16_t ADC_VALUE = 0;
-  if((++led & 3) == 3)
+  if ((++led & 3) == 3)
   {
     sw.beginTransmission(qwiicAddress);
-    sw.write((led == 3)? COMMAND_LED_ON : COMMAND_LED_OFF);  // command for status
+    sw.write((led == 3) ? COMMAND_LED_ON : COMMAND_LED_OFF); // command for status
     sw.endTransmission();             // stop transmitting //this looks like it was essential.
-    if(led > 7) led = 0;
+    if (led > 7) led = 0;
   }
   sw.beginTransmission(qwiicAddress);
   sw.write(COMMAND_GET_VALUE);        // command for status
@@ -440,8 +445,10 @@ void loop()
       if (loudness == true)
       {
         int16_t b = (scale_value() * MAX_BRIGHT) >> shiftbright;
+#if defined(LOUD_DEBUG)
         Serial.print("Bright sensor: ");
         Serial.println(b, HEX);
+#endif
         FastLED.setBrightness(b);  // global led brightness, dont remove without understanding power requirements
       }
 #endif
@@ -452,8 +459,10 @@ void loop()
       if (loudness == true)
       {
         int16_t b = (scale_value() * MAX_BRIGHT) >> shiftbright;
+#if defined(LOUD_DEBUG)
         Serial.print("Bright sensor: ");
         Serial.println(b, HEX);
+#endif
         FastLED.setBrightness(b);  // global led brightness, dont remove without understanding power requirements
       }
 #endif
