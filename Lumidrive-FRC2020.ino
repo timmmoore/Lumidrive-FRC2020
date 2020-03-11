@@ -70,6 +70,7 @@ TwoWire sw(&sercom0, A3, A4);
 uint8_t qwiicAddress = 0x38;          // Default loudness sensor address
 uint8_t loudness = false;
 bool soundoff = false;
+uint16_t powlevel = 512;
 #endif
 
 #if defined(LOUD_SENSOR)
@@ -122,7 +123,7 @@ uint16_t scale_value()
   else
     avgVol = (avgVol + value) / 2.0;      // If non-zero, take an "average" of volumes.
   //value = pow(1024, value/maxVol) - 1;
-  value = (pow(512, value / maxVol) - 1) * 2; // scale
+  value = (pow(powlevel, value / maxVol) - 1) * (1024/powlevel); // scale
 #if defined(LOUD_DEBUG)
   Serial.print(" pow:");
   Serial.print(value, DEC);
@@ -365,6 +366,11 @@ void ParseLine()
     {
       checkSoundSensor();  
     }
+  }
+  else if (com == 'p')                // power level
+  {
+    if((red > 0) && (red <= 1024))
+      powlevel = red;
   }
 #endif
 }
