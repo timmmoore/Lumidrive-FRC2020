@@ -69,6 +69,7 @@ uint8_t shiftbright = DEF_SHIFT;
 TwoWire sw(&sercom0, A3, A4);
 uint8_t qwiicAddress = 0x38;          // Default loudness sensor address
 uint8_t loudness = false;
+bool soundoff = false;
 #endif
 
 #if defined(LOUD_SENSOR)
@@ -189,18 +190,11 @@ uint16_t get_value()
 }
 #endif
 
-void setup() {
-  delay(500);
-  Serial.begin(115200);
-#ifdef WAITUSB
-  while (!Serial);                    // if debugging to wait for USB serial monitor before starting
-  Serial.println("Lumidrive");
-#endif
-  pinMode(LED, OUTPUT);               // led pin is output
-  pinMode(BUTTON, INPUT_PULLUP);      // button pin is input, enable pullup
-  pinMode(CONTROL, INPUT_PULLUP);     // input pin, enable pullup
-
+void checkSoundSensor()
+{
 #if defined(LOUD_SENSOR)
+  loudness = false;
+  sw.end();
   pinMode(A3, INPUT);                 // check if soft I2C has pullups
   pinMode(A4, INPUT);
   if ((digitalRead(A3) == 0) || (digitalRead(A4) == 0))
@@ -221,6 +215,20 @@ void setup() {
     testForLoudSensor();
   }
 #endif
+}
+
+void setup() {
+  delay(500);
+  Serial.begin(115200);
+#ifdef WAITUSB
+  while (!Serial);                    // if debugging to wait for USB serial monitor before starting
+  Serial.println("Lumidrive");
+#endif
+  pinMode(LED, OUTPUT);               // led pin is output
+  pinMode(BUTTON, INPUT_PULLUP);      // button pin is input, enable pullup
+  pinMode(CONTROL, INPUT_PULLUP);     // input pin, enable pullup
+
+  checkSoundSensor();
 
   FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS_FULL).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps( 5, MAX_POWER_MILLIAMPS);
@@ -349,6 +357,16 @@ void ParseLine()
     else
       next_type();
   }
+#if defined(LOUD_SENSOR)
+  else if (com == 'l')                // sound on/off
+  {
+    soundoff = !!red;
+    if(soundoff == false)
+    {
+      checkSoundSensor();  
+    }
+  }
+#endif
 }
 
 uint8_t ledo = HIGH;                  // status led state
@@ -442,7 +460,7 @@ void loop()
   {
     case NEUTRAL:
 #if defined(LOUD_SENSOR)
-      if (loudness == true)
+      if ((loudness == true) && (soundoff == false))
       {
         int16_t b = (scale_value() * MAX_BRIGHT) >> shiftbright;
 #if defined(LOUD_DEBUG)
@@ -456,7 +474,7 @@ void loop()
       break;
     case RAINBOW:
 #if defined(LOUD_SENSOR)
-      if (loudness == true)
+      if ((loudness == true) && (soundoff == false))
       {
         int16_t b = (scale_value() * MAX_BRIGHT) >> shiftbright;
 #if defined(LOUD_DEBUG)
